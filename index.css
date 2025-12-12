@@ -1,0 +1,5 @@
+/* Base styles managed by Tailwind via CDN in this setup, this file prevents build warning */
+body {
+  margin: 0;
+  padding: 0;
+}

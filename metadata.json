@@ -1,0 +1,7 @@
+{
+  "name": "Copy of PatrimoineÉtat Connect / تواصل أملاك الدولة",
+  "description": "Plateforme de collaboration et de recensement du patrimoine de l'État. Facilite la communication (WhatsApp/Email) et la déclaration des biens entre les ministères. / منصة تعاون وإحصاء أملاك الدولة. تسهل التواصل (واتساب/بريد إلكتروني) والتصريح بالممتلكات بين الوزارات.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
