@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 // Récupération sécurisée de la clé (injectée par Vite)

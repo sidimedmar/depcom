@@ -8,7 +8,6 @@ const ASSETS_KEY = 'app_assets_v1';
 const CONTACTS_KEY = 'app_contacts_v1';
 
 // List of keys that are allowed to be modified via the UI
-// Expanded to include Login screen texts
 export const EDITABLE_KEYS = [
     // General
     'appTitle',
