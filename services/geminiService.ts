@@ -1,7 +1,9 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// Récupération sécurisée de la clé (injectée par Vite)
+// Access the key safely. In Vite, process.env.API_KEY is replaced by the define plugin string.
+// We also fallback to an empty string to prevent undefined errors.
+// @ts-ignore - process might be undefined in some browser contexts if not polyfilled, but the string replacement handles it.
 const apiKey = process.env.API_KEY || '';
 
 // Initialisation conditionnelle pour éviter le crash global de l'app si la clé est absente
