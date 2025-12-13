@@ -1,6 +1,9 @@
 
-
 import { MinistryContact, Translation, AssetDeclaration, Wilaya } from './types';
+
+// --- CONFIGURATION ---
+// COLLEZ VOTRE URL GOOGLE APPS SCRIPT ICI POUR QU'ELLE SOIT ACTIVE PAR DÉFAUT PARTOUT
+export const DEFAULT_GOOGLE_SHEET_URL = ""; 
 
 export const WILAYAS: Wilaya[] = [
   'Adrar', 'Assaba', 'Brakna', 'Dakhlet Nouadhibou', 'Gorgol', 
@@ -67,7 +70,8 @@ export const TEXTS: Translation = {
   fullName: { fr: "Nom Complet", ar: "الاسم الكامل" },
   ministry: { fr: "Ministère", ar: "الوزارة" },
   roleSuperAdmin: { fr: "Super Administrateur", ar: "مدير فائق" },
-  roleMinistryAdmin: { fr: "Admin Ministère", ar: "مدير وزارة" },
+  roleDeputyAdmin: { fr: "Admin", ar: "مدير" },
+  roleMinistryAdmin: { fr: "Point Focal (Admin)", ar: "نقطة اتصال (مدير)" },
   roleEditor: { fr: "Éditeur", ar: "محرر" },
   roleViewer: { fr: "Lecteur", ar: "قارئ" },
 

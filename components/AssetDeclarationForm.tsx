@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AssetDeclaration, Language, MinistryContact, AssetStatus, Wilaya, AssetType, User, AssetDocument } from '../types';
 import { TEXTS, WILAYAS, MINISTRY_STRUCTURES, ASSET_CATEGORIES } from '../constants';
-import { parseCSV, exportToCSV } from '../services/sheetService';
+import { parseCSV, exportToCSV, syncAssetToSheet } from '../services/sheetService';
 import { Save, CheckCircle, MapPin, Calculator, Upload, ChevronRight, ChevronLeft, Building, Car, Laptop, Armchair, Hammer, Camera, X, Building2, FileText, Eye, AlertTriangle, Crosshair, Network, Plus, Download, Search, Filter, Edit2, Trash2, CheckSquare, Square, ArrowLeft, FileSpreadsheet, PlusCircle, Map } from 'lucide-react';
 
 declare const L: any;
@@ -32,7 +33,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
     editingAsset, onCancelEdit, assets = [], onDeleteAsset 
 }) => {
   const isRTL = lang === 'ar';
-  const isSuperAdmin = currentUser.role === 'SUPER_ADMIN';
+  const isGlobalAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEPUTY_ADMIN';
 
   // --- VIEW MODE STATE (List vs Form) ---
   const [viewMode, setViewMode] = useState<'list' | 'form'>('list');
@@ -138,10 +139,10 @@ const AssetDeclarationForm: React.FC<Props> = ({
   const filteredAssets = useMemo(() => {
       let data = assets;
       // 1. Permission Filter
-      if (currentUser.role !== 'SUPER_ADMIN') {
+      if (!isGlobalAdmin) {
           data = data.filter(a => a.ministryId === currentUser.ministryId);
       } else if (filterMinistry) {
-          // Super Admin specific filter
+          // Admin specific filter
           data = data.filter(a => a.ministryId === filterMinistry);
       }
 
@@ -159,7 +160,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
           data = data.filter(a => a.type === filterType);
       }
       return data;
-  }, [assets, currentUser, searchTerm, filterType, filterMinistry]);
+  }, [assets, currentUser, searchTerm, filterType, filterMinistry, isGlobalAdmin]);
 
   const toggleSelect = (id: string) => {
       const next = new Set(selectedIds);
@@ -251,7 +252,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
       if (currentStep === 1) {
           if (!formData.reference?.trim()) { newErrors.reference = true; isValid = false; }
           if (!formData.acquisitionDate) { newErrors.acquisitionDate = true; isValid = false; }
-          if (isSuperAdmin) {
+          if (isGlobalAdmin) {
              if (isCustomMinistry) {
                  if(!customMinistryName.fr && !customMinistryName.ar) { newErrors.ministryId = true; isValid = false; }
              } else if (!formData.ministryId) { 
@@ -278,7 +279,9 @@ const AssetDeclarationForm: React.FC<Props> = ({
   const handleFinalSubmit = () => {
     if (!validateStep(step)) return;
     let finalMinistryId = formData.ministryId;
-    if (isSuperAdmin && isCustomMinistry && onAddContacts) {
+    let finalMinistryName = null;
+
+    if (isGlobalAdmin && isCustomMinistry && onAddContacts) {
         const newMinistry: MinistryContact = {
             id: `manual-${Date.now()}`,
             name: { fr: customMinistryName.fr || 'Nouveau Ministère', ar: customMinistryName.ar || 'وزارة جديدة' },
@@ -291,6 +294,11 @@ const AssetDeclarationForm: React.FC<Props> = ({
         };
         onAddContacts([newMinistry]);
         finalMinistryId = newMinistry.id;
+        finalMinistryName = newMinistry.name;
+    } else {
+        // Find name for existing ministry
+        const contact = contacts.find(c => c.id === (finalMinistryId || currentUser.ministryId));
+        if (contact) finalMinistryName = contact.name;
     }
 
     const assetToSave: AssetDeclaration = {
@@ -311,7 +319,14 @@ const AssetDeclarationForm: React.FC<Props> = ({
       documents: formData.documents || []
     };
     
+    // 1. Save locally
     onSaveAsset(assetToSave);
+
+    // 2. Sync to Google Sheets if URL is configured
+    if (finalMinistryName) {
+        syncAssetToSheet(assetToSave, finalMinistryName);
+    }
+    
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
@@ -338,7 +353,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
               <div>
                   <h2 className="text-2xl font-bold text-gov-900">{TEXTS.myAssets[lang]}</h2>
                   <p className="text-gray-500 text-sm">
-                      {isSuperAdmin 
+                      {isGlobalAdmin 
                         ? (lang === 'fr' ? 'Vue globale du patrimoine de l\'État par Ministère' : 'نظرة شاملة على ممتلكات الدولة حسب الوزارة')
                         : (lang === 'fr' ? `Gestion du patrimoine : ${contacts.find(c => c.id === currentUser.ministryId)?.name[lang] || ''}` : `إدارة الممتلكات`)}
                   </p>
@@ -366,8 +381,8 @@ const AssetDeclarationForm: React.FC<Props> = ({
               </div>
               
               <div className="flex gap-2 w-full md:w-auto">
-                  {/* Super Admin Ministry Filter */}
-                  {isSuperAdmin && (
+                  {/* Super Admin & Deputy Admin Ministry Filter */}
+                  {isGlobalAdmin && (
                       <div className="relative w-full md:w-64">
                            <Building2 className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 ${isRTL ? 'left-3' : 'right-3'}`} />
                            <select 
@@ -473,7 +488,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
                            </div>
 
                            <div className="p-5 pl-12">
-                               {isSuperAdmin && (
+                               {isGlobalAdmin && (
                                    <div className="mb-2 inline-flex items-center gap-1.5 bg-gray-100 text-gray-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">
                                        <Building2 className="w-3 h-3" />
                                        <span className="truncate max-w-[200px]">{ministryName}</span>
@@ -592,7 +607,7 @@ const AssetDeclarationForm: React.FC<Props> = ({
             {step === 1 && (
               <div className="space-y-6 animate-fade-in">
                 {/* 1.1 Context Banner */}
-                {!isSuperAdmin && currentUser.ministryId && (
+                {!isGlobalAdmin && currentUser.ministryId && (
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6 flex items-center gap-3">
                          <div className="bg-blue-200 p-2 rounded text-blue-700"><Building2 className="w-5 h-5" /></div>
                          <div>
@@ -602,8 +617,8 @@ const AssetDeclarationForm: React.FC<Props> = ({
                     </div>
                 )}
 
-                {/* 1.2 Ministry Selection (Super Admin only) */}
-                {isSuperAdmin && (
+                {/* 1.2 Ministry Selection (Super Admin & Deputy Admin) */}
+                {isGlobalAdmin && (
                     <div className="bg-purple-50 p-5 rounded-lg border border-purple-100">
                         <div className="flex justify-between items-center mb-2">
                              <label className="block text-sm font-bold text-purple-900 flex items-center gap-2"><Building2 className="w-4 h-4" />{TEXTS.ministry[lang]} <span className="text-red-500">*</span></label>
@@ -930,24 +945,30 @@ const LocationPickerModal = ({ lang, initialLat, initialLng, onConfirm, onClose 
     );
 };
 
+// Helper Component defined OUTSIDE to prevent re-mounting focus loss issues
+const InputGroup = ({ label, value, field, updateSpecific }: { label: string, value: string, field: string, updateSpecific: (k: string, v: string) => void }) => (
+    <div>
+        <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>
+        <input 
+            type="text" 
+            className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-gov-500" 
+            value={value || ''} 
+            onChange={e => updateSpecific(field, e.target.value)} 
+        />
+    </div>
+);
+
 // Sub-component for specific fields to keep main component cleaner
 const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Partial<AssetDeclaration>, lang: Language, updateSpecific: (k: string, v: string) => void }) => {
     const details = formData.specificDetails || {};
     const type = formData.type as AssetType;
 
-    const InputGroup = ({ label, value, field }: { label: string, value: string, field: string }) => (
-        <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">{label}</label>
-            <input type="text" className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-gov-500" value={value || ''} onChange={e => updateSpecific(field, e.target.value)} />
-        </div>
-    );
-
     if (type === 'Vehicle') return (
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4 animate-fade-in">
             <div className="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-2"><Car className="w-5 h-5" /> {TEXTS.assetType[lang]}: {TEXTS.brand[lang]} & {TEXTS.model[lang]}</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <InputGroup label={TEXTS.brand[lang]} value={details.brand as string} field="brand" />
-                <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" />
+                <InputGroup label={TEXTS.brand[lang]} value={details.brand as string} field="brand" updateSpecific={updateSpecific} />
+                <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" updateSpecific={updateSpecific} />
                 <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1">{TEXTS.plateNumber[lang]}</label>
                     <input type="text" className="w-full border rounded-lg p-2 font-mono uppercase bg-white text-sm" value={details.plateNumber || ''} onChange={e => updateSpecific('plateNumber', e.target.value)} />
@@ -977,7 +998,7 @@ const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Pa
                         <option value="Auto">{TEXTS.transAuto[lang]}</option>
                     </select>
                 </div>
-                <InputGroup label={TEXTS.powerCV[lang]} value={details.powerCV as string} field="powerCV" />
+                <InputGroup label={TEXTS.powerCV[lang]} value={details.powerCV as string} field="powerCV" updateSpecific={updateSpecific} />
             </div>
         </div>
     );
@@ -987,11 +1008,11 @@ const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Pa
              <div className="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-2"><Building className="w-5 h-5" /> {TEXTS.assetType[lang]}: {lang === 'fr' ? 'Détails Foncier' : 'تفاصيل العقار'}</div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div><label className="block text-xs font-semibold text-gray-500 mb-1">{TEXTS.surfaceArea[lang]}</label><input type="number" className="w-full border rounded-lg p-2 text-sm" value={details.surfaceArea || ''} onChange={e => updateSpecific('surfaceArea', e.target.value)} /></div>
-                 <InputGroup label={TEXTS.landTitle[lang]} value={details.landTitle as string} field="landTitle" />
-                 <InputGroup label={TEXTS.cadastralRef[lang]} value={details.cadastralRef as string} field="cadastralRef" />
-                 <InputGroup label={TEXTS.usage[lang]} value={details.usage as string} field="usage" />
-                 <InputGroup label={TEXTS.floors[lang]} value={details.floors as string} field="floors" />
-                 <InputGroup label={TEXTS.constructionYear[lang]} value={details.constructionYear as string} field="constructionYear" />
+                 <InputGroup label={TEXTS.landTitle[lang]} value={details.landTitle as string} field="landTitle" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.cadastralRef[lang]} value={details.cadastralRef as string} field="cadastralRef" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.usage[lang]} value={details.usage as string} field="usage" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.floors[lang]} value={details.floors as string} field="floors" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.constructionYear[lang]} value={details.constructionYear as string} field="constructionYear" updateSpecific={updateSpecific} />
              </div>
         </div>
     );
@@ -1010,13 +1031,13 @@ const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Pa
                         <option value="Printer">Imprimante</option>
                     </select>
                  </div>
-                 <InputGroup label={TEXTS.brand[lang]} value={details.brand as string} field="brand" />
-                 <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" />
-                 <InputGroup label={TEXTS.specs[lang]} value={details.specs as string} field="specs" />
-                 <InputGroup label={TEXTS.ram[lang]} value={details.ram as string} field="ram" />
-                 <InputGroup label={TEXTS.storage[lang]} value={details.storage as string} field="storage" />
-                 <InputGroup label={TEXTS.serialNumber[lang]} value={details.serialNumber as string} field="serialNumber" />
-                 <InputGroup label={TEXTS.os[lang]} value={details.os as string} field="os" />
+                 <InputGroup label={TEXTS.brand[lang]} value={details.brand as string} field="brand" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.specs[lang]} value={details.specs as string} field="specs" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.ram[lang]} value={details.ram as string} field="ram" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.storage[lang]} value={details.storage as string} field="storage" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.serialNumber[lang]} value={details.serialNumber as string} field="serialNumber" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.os[lang]} value={details.os as string} field="os" updateSpecific={updateSpecific} />
              </div>
         </div>
     );
@@ -1025,10 +1046,10 @@ const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Pa
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4 animate-fade-in">
              <div className="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-2"><Armchair className="w-5 h-5" /> {TEXTS.assetType[lang]}: {TEXTS.category[lang]}</div>
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                 <InputGroup label={TEXTS.category[lang]} value={details.category as string} field="category" />
-                 <InputGroup label={TEXTS.material[lang]} value={details.material as string} field="material" />
-                 <InputGroup label={TEXTS.color[lang]} value={details.color as string} field="color" />
-                 <InputGroup label={TEXTS.dimensions[lang]} value={details.dimensions as string} field="dimensions" />
+                 <InputGroup label={TEXTS.category[lang]} value={details.category as string} field="category" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.material[lang]} value={details.material as string} field="material" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.color[lang]} value={details.color as string} field="color" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.dimensions[lang]} value={details.dimensions as string} field="dimensions" updateSpecific={updateSpecific} />
                  <div><label className="block text-xs font-semibold text-gray-500 mb-1">{TEXTS.quantity[lang]}</label><input type="number" className="w-full border rounded-lg p-2 text-sm" value={details.quantity || ''} onChange={e => updateSpecific('quantity', e.target.value)} /></div>
              </div>
         </div>
@@ -1038,12 +1059,12 @@ const RenderSpecificFields = ({ formData, lang, updateSpecific }: { formData: Pa
         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-4 animate-fade-in">
              <div className="font-bold text-gray-700 border-b pb-2 mb-3 flex items-center gap-2"><Hammer className="w-5 h-5" /> {TEXTS.assetType[lang]}: {TEXTS.details[lang]}</div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <InputGroup label={TEXTS.manufacturer[lang]} value={details.manufacturer as string} field="manufacturer" />
-                 <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" />
-                 <InputGroup label={TEXTS.modelNumber[lang]} value={details.modelNumber as string} field="modelNumber" />
-                 <InputGroup label={TEXTS.powerSupply[lang]} value={details.powerSupply as string} field="powerSupply" />
-                 <InputGroup label={TEXTS.maintenanceFreq[lang]} value={details.maintenanceFreq as string} field="maintenanceFreq" />
-                 <InputGroup label={TEXTS.warranty[lang]} value={details.warranty as string} field="warranty" />
+                 <InputGroup label={TEXTS.manufacturer[lang]} value={details.manufacturer as string} field="manufacturer" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.model[lang]} value={details.model as string} field="model" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.modelNumber[lang]} value={details.modelNumber as string} field="modelNumber" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.powerSupply[lang]} value={details.powerSupply as string} field="powerSupply" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.maintenanceFreq[lang]} value={details.maintenanceFreq as string} field="maintenanceFreq" updateSpecific={updateSpecific} />
+                 <InputGroup label={TEXTS.warranty[lang]} value={details.warranty as string} field="warranty" updateSpecific={updateSpecific} />
              </div>
         </div>
     );

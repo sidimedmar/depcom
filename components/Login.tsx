@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Language, Translation, User, MinistryContact } from '../types';
 import { authenticate, getUsers, registerUser } from '../services/authService';
-import { Lock, User as UserIcon, ShieldCheck, ChevronRight, Building2, UserPlus, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Lock, User as UserIcon, ChevronRight, Building2, UserPlus, ArrowLeft, PlusCircle } from 'lucide-react';
 
 interface Props {
   lang: Language;
@@ -123,8 +124,21 @@ const Login: React.FC<Props> = ({ lang, onLogin, appTexts, contacts, onRegisterN
         {/* Left Side: Forms */}
         <div className="w-full md:w-1/2 p-8 flex flex-col justify-center relative z-10 transition-all">
             <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gov-100 text-gov-700 mb-4">
-                    <ShieldCheck className="w-8 h-8" />
+                <div className="inline-flex items-center justify-center w-24 h-16 mb-4 rounded shadow-sm overflow-hidden border border-gray-100">
+                    <svg viewBox="0 0 900 600" className="w-full h-full object-cover">
+                        {/* Green Background */}
+                        <rect width="900" height="600" fill="#006233"/>
+                        {/* Red Stripes */}
+                        <rect width="900" height="90" fill="#D01C1F"/>
+                        <rect y="510" width="900" height="90" fill="#D01C1F"/>
+                        
+                        {/* Crescent (Gold circle minus Green circle) */}
+                        <circle cx="450" cy="320" r="150" fill="#FFC400"/>
+                        <circle cx="450" cy="290" r="140" fill="#006233"/>
+                        
+                        {/* Star (Gold) */}
+                        <polygon fill="#FFC400" points="450,190 468,245 526,245 479,279 497,334 450,300 403,334 421,279 374,245 432,245"/>
+                    </svg>
                 </div>
                 <h2 className="text-2xl font-bold text-gov-900 mb-2">{appTexts.appTitle[lang]}</h2>
                 <p className="text-gray-500 text-sm">
@@ -348,14 +362,6 @@ const Login: React.FC<Props> = ({ lang, onLogin, appTexts, contacts, onRegisterN
                           : "لا يوجد حساب عام."}
                     </div>
                 )}
-            </div>
-
-            <div className="mt-8 p-4 bg-green-50 text-green-800 text-xs rounded-lg border border-green-100 leading-relaxed">
-                <strong>{lang === 'fr' ? 'Sécurité des données :' : 'أمن البيانات:'}</strong> 
-                <br />
-                {lang === 'fr' ? 
-                "Les données sont stockées localement. Utilisez le bouton 'Exporter' dans le tableau de bord pour envoyer vos données à l'administrateur central." : 
-                "يتم تخزين البيانات محليًا. استخدم زر 'تصدير' في لوحة القيادة لإرسال بياناتك إلى المسؤول المركزي."}
             </div>
         </div>
 

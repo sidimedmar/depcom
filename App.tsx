@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Tab, Language, AssetDeclaration, User, MinistryContact, Translation, WorkGroup } from './types';
 import { TEXTS as DEFAULT_TEXTS, INITIAL_CONTACTS, INITIAL_ASSETS } from './constants';
@@ -333,7 +334,11 @@ const App: React.FC = () => {
               <AIAssistant lang={lang} />
             )}
             {activeTab === Tab.USERS && hasPermission(currentUser, 'view_users') && (
-              <UserManagement lang={lang} contacts={contacts} />
+              <UserManagement 
+                lang={lang} 
+                contacts={contacts} 
+                onRegisterNewMinistry={handleAddContacts}
+              />
             )}
             {activeTab === Tab.SETTINGS && currentUser.role === 'SUPER_ADMIN' && (
               <Settings lang={lang} onUpdate={handleTextsUpdate} />

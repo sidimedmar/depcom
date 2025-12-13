@@ -1,15 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, Language, UserRole, MinistryContact, Tab } from '../types';
 import { TEXTS } from '../constants';
 import { getUsers, saveUser, deleteUser, getDefaultTabsForRole } from '../services/authService';
-import { Plus, Trash2, Shield, User as UserIcon, CheckSquare, Square, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Shield, User as UserIcon, CheckSquare, Square, Edit2, PlusCircle } from 'lucide-react';
 
 interface Props {
   lang: Language;
   contacts: MinistryContact[];
+  onRegisterNewMinistry?: (contacts: MinistryContact[]) => void;
 }
 
-const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
+const UserManagement: React.FC<Props> = ({ lang, contacts, onRegisterNewMinistry }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const isRTL = lang === 'ar';
@@ -22,6 +24,9 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
     ministryId: '',
     allowedTabs: getDefaultTabsForRole('VIEWER')
   });
+
+  // Custom Ministry State
+  const [customMinistry, setCustomMinistry] = useState({ fr: '', ar: '' });
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
@@ -59,6 +64,7 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
           ministryId: user.ministryId || '',
           allowedTabs: user.allowedTabs
       });
+      setCustomMinistry({ fr: '', ar: '' }); // Reset custom fields
       setEditingUserId(user.id);
       setIsAdding(true);
   };
@@ -67,13 +73,45 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
     e.preventDefault();
     if (!formData.username || !formData.password || !formData.fullName) return;
 
+    let finalMinistryId = formData.ministryId;
+
+    // Handle NEW Ministry creation
+    if (formData.ministryId === 'NEW') {
+         if (!customMinistry.fr.trim() || !customMinistry.ar.trim()) {
+             alert(lang === 'fr' ? 'Veuillez saisir le nom du ministère (FR et AR).' : 'يرجى إدخال اسم الوزارة (بالفرنسية والعربية).');
+             return;
+         }
+
+         if (onRegisterNewMinistry) {
+             const newMinistry: MinistryContact = {
+                 id: `manual-${Date.now()}`,
+                 name: { fr: customMinistry.fr, ar: customMinistry.ar },
+                 department: { fr: 'Direction Générale', ar: 'الإدارة العامة' }, // Default
+                 representative: formData.fullName || 'Admin',
+                 role: { fr: 'Administrateur', ar: 'مدير' },
+                 phone: '',
+                 email: '',
+                 complianceStatus: 'pending'
+             };
+             // Add to global state
+             onRegisterNewMinistry([newMinistry]);
+             finalMinistryId = newMinistry.id;
+         }
+    }
+
+    // Role validation
+    if ((formData.role === 'MINISTRY_ADMIN' || formData.role === 'EDITOR') && !finalMinistryId) {
+        alert(lang === 'fr' ? 'Veuillez sélectionner un ministère.' : 'يرجى اختيار الوزارة.');
+        return;
+    }
+
     const userToSave: User = {
         id: editingUserId || Math.random().toString(36).substr(2, 9),
-        username: formData.username.trim().toLowerCase(),
-        password: formData.password.trim(),
-        fullName: formData.fullName.trim(),
+        username: formData.username!.trim().toLowerCase(),
+        password: formData.password!.trim(),
+        fullName: formData.fullName!.trim(),
         role: formData.role as UserRole,
-        ministryId: formData.ministryId === '' ? undefined : formData.ministryId,
+        ministryId: finalMinistryId === '' || finalMinistryId === 'NEW' ? undefined : finalMinistryId,
         allowedTabs: formData.allowedTabs
     };
 
@@ -83,6 +121,7 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
     // Reset state
     setIsAdding(false);
     setEditingUserId(null);
+    setCustomMinistry({ fr: '', ar: '' });
     setFormData({ 
         role: 'VIEWER', 
         username: '', 
@@ -96,6 +135,7 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
   const handleCancel = () => {
       setIsAdding(false);
       setEditingUserId(null);
+      setCustomMinistry({ fr: '', ar: '' });
       setFormData({ 
         role: 'VIEWER', 
         username: '', 
@@ -116,6 +156,7 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
   const getRoleLabel = (role: UserRole) => {
       switch(role) {
           case 'SUPER_ADMIN': return TEXTS.roleSuperAdmin[lang];
+          case 'DEPUTY_ADMIN': return TEXTS.roleDeputyAdmin[lang];
           case 'MINISTRY_ADMIN': return TEXTS.roleMinistryAdmin[lang];
           case 'EDITOR': return TEXTS.roleEditor[lang];
           default: return TEXTS.roleViewer[lang];
@@ -194,33 +235,62 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
                             disabled={editingUserId === 'superadmin'} // Cannot demote superadmin
                           >
                               <option value="SUPER_ADMIN">{TEXTS.roleSuperAdmin[lang]}</option>
+                              <option value="DEPUTY_ADMIN">{TEXTS.roleDeputyAdmin[lang]}</option>
                               <option value="MINISTRY_ADMIN">{TEXTS.roleMinistryAdmin[lang]}</option>
                               <option value="EDITOR">{TEXTS.roleEditor[lang]}</option>
                               <option value="VIEWER">{TEXTS.roleViewer[lang]}</option>
                           </select>
                       </div>
                       
-                      {(formData.role === 'MINISTRY_ADMIN' || formData.role === 'EDITOR') && (
-                          <div>
+                      {(formData.role === 'MINISTRY_ADMIN' || formData.role === 'EDITOR' || formData.role === 'VIEWER') && (
+                          <div className="animate-fade-in">
                             <label className="block text-xs font-semibold text-gray-500 mb-1">{TEXTS.ministry[lang]}</label>
                             <select 
                                 className="w-full p-2 border rounded focus:ring-2 focus:ring-gov-500 bg-white"
                                 value={formData.ministryId}
                                 onChange={e => setFormData({...formData, ministryId: e.target.value})}
-                                required
+                                required={formData.role !== 'VIEWER'}
                             >
                                 <option value="">-- {TEXTS.ministry[lang]} --</option>
                                 {contacts.map(c => (
                                     <option key={c.id} value={c.id}>{c.name[lang]}</option>
                                 ))}
+                                <option value="NEW" className="font-bold text-gov-600 bg-gray-50">
+                                    + {lang === 'fr' ? 'Autre (Ajouter manuellement)' : 'آخر (إضافة يدويا)'}
+                                </option>
                             </select>
+                          </div>
+                      )}
+
+                      {/* Manual Ministry Input */}
+                      {formData.ministryId === 'NEW' && (
+                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2 animate-fade-in">
+                              <p className="text-xs text-gov-600 font-bold flex items-center gap-1">
+                                  <PlusCircle className="w-3 h-3" />
+                                  {lang === 'fr' ? 'Nouveau Ministère / Structure' : 'وزارة / هيكل جديد'}
+                              </p>
+                              <input 
+                                  type="text"
+                                  placeholder="Nom (Français)"
+                                  className="w-full border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-gov-500"
+                                  value={customMinistry.fr}
+                                  onChange={(e) => setCustomMinistry({...customMinistry, fr: e.target.value})}
+                              />
+                              <input 
+                                  type="text"
+                                  placeholder="الاسم (العربية)"
+                                  className="w-full border-gray-300 rounded p-1.5 text-xs focus:ring-1 focus:ring-gov-500 text-right"
+                                  dir="rtl"
+                                  value={customMinistry.ar}
+                                  onChange={(e) => setCustomMinistry({...customMinistry, ar: e.target.value})}
+                              />
                           </div>
                       )}
 
                       <div className="pt-2">
                           <label className="block text-xs font-semibold text-gray-500 mb-2">{lang === 'fr' ? 'Onglets Autorisés' : 'التبويبات المسموحة'}</label>
                           <div className="grid grid-cols-2 gap-2">
-                              {Object.values(Tab).filter(t => t !== Tab.USERS).map(tab => (
+                              {Object.values(Tab).filter(t => t !== Tab.USERS && t !== Tab.SETTINGS).map(tab => (
                                   <div 
                                     key={tab} 
                                     onClick={() => toggleTab(tab)}
@@ -265,8 +335,8 @@ const UserManagement: React.FC<Props> = ({ lang, contacts }) => {
 
                   <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${user.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
-                              {user.role === 'SUPER_ADMIN' ? <Shield className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
+                          <div className={`p-2 rounded-full ${user.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-600' : user.role === 'DEPUTY_ADMIN' ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-600'}`}>
+                              {user.role === 'SUPER_ADMIN' || user.role === 'DEPUTY_ADMIN' ? <Shield className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
                           </div>
                           <div>
                               <h3 className="font-bold text-gray-900">{user.fullName}</h3>

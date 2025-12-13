@@ -1,11 +1,12 @@
 
 import { Translation } from "../types";
-import { TEXTS as DEFAULT_TEXTS } from "../constants";
+import { TEXTS as DEFAULT_TEXTS, DEFAULT_GOOGLE_SHEET_URL } from "../constants";
 
 const SETTINGS_KEY = 'app_settings_texts_v1';
 const USERS_KEY = 'app_users_v1';
 const ASSETS_KEY = 'app_assets_v1';
 const CONTACTS_KEY = 'app_contacts_v1';
+const SHEET_URL_KEY = 'app_google_sheet_url_v1';
 
 // List of keys that are allowed to be modified via the UI
 export const EDITABLE_KEYS = [
@@ -46,6 +47,30 @@ export const resetAppTexts = () => {
     return DEFAULT_TEXTS;
 };
 
+// --- GOOGLE SHEETS SETTINGS ---
+export const getGoogleSheetUrl = (): string => {
+    // 1. Check Local Storage (Admin override for testing)
+    const local = localStorage.getItem(SHEET_URL_KEY);
+    if (local && local.trim() !== '') {
+        return local;
+    }
+
+    // 2. Check Environment Variable (Best practice for deployment)
+    // In Vite, defined env vars are replaced at build time
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env.SHEET_URL) {
+        // @ts-ignore
+        return process.env.SHEET_URL;
+    }
+
+    // 3. Check Hardcoded Constant (Easiest for quick fixes)
+    return DEFAULT_GOOGLE_SHEET_URL || '';
+};
+
+export const saveGoogleSheetUrl = (url: string) => {
+    localStorage.setItem(SHEET_URL_KEY, url.trim());
+};
+
 // --- BACKUP SYSTEM ---
 
 export const createFullBackup = () => {
@@ -56,7 +81,8 @@ export const createFullBackup = () => {
             users: localStorage.getItem(USERS_KEY),
             texts: localStorage.getItem(SETTINGS_KEY),
             assets: localStorage.getItem(ASSETS_KEY),
-            contacts: localStorage.getItem(CONTACTS_KEY)
+            contacts: localStorage.getItem(CONTACTS_KEY),
+            sheetUrl: localStorage.getItem(SHEET_URL_KEY)
         }
     };
     
@@ -84,6 +110,7 @@ export const restoreFullBackup = (file: File): Promise<boolean> => {
                 if (parsed.data.texts) localStorage.setItem(SETTINGS_KEY, parsed.data.texts);
                 if (parsed.data.assets) localStorage.setItem(ASSETS_KEY, parsed.data.assets);
                 if (parsed.data.contacts) localStorage.setItem(CONTACTS_KEY, parsed.data.contacts);
+                if (parsed.data.sheetUrl) localStorage.setItem(SHEET_URL_KEY, parsed.data.sheetUrl);
 
                 resolve(true);
             } catch (err) {

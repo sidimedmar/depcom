@@ -1,5 +1,6 @@
 
 import { AssetDeclaration, MinistryContact } from "../types";
+import { getGoogleSheetUrl } from "./settingsService";
 
 // Helper to sanitize fields for CSV
 const safeStr = (val: any) => {
@@ -136,4 +137,56 @@ export const parseCSV = (file: File): Promise<any[]> => {
         reader.onerror = (err) => reject(err);
         reader.readAsText(file);
     });
+};
+
+// --- SYNC TO GOOGLE SHEETS ---
+
+export const syncAssetToSheet = async (asset: AssetDeclaration, ministryName?: { fr: string, ar: string }) => {
+    const sheetUrl = getGoogleSheetUrl();
+    if (!sheetUrl) return;
+
+    const details = asset.specificDetails || {};
+    
+    // Create a flat object for the sheet row
+    const payload = {
+        id: asset.id,
+        reference: asset.reference,
+        ministryId: asset.ministryId,
+        ministryNameFR: ministryName?.fr || '',
+        ministryNameAR: ministryName?.ar || '',
+        subEntity: asset.subEntity || '',
+        type: asset.type,
+        condition: asset.condition,
+        value: asset.value,
+        acquisitionDate: asset.acquisitionDate,
+        wilaya: asset.wilaya,
+        locationDetails: asset.locationDetails,
+        lat: asset.coordinates?.lat || '',
+        lng: asset.coordinates?.lng || '',
+        description: asset.description,
+        // Specifics
+        brand: details.brand || '',
+        model: details.model || '',
+        plateNumber: details.plateNumber || '',
+        serialNumber: details.serialNumber || '',
+        surfaceArea: details.surfaceArea || '',
+        landTitle: details.landTitle || '',
+        timestamp: new Date().toISOString()
+    };
+
+    try {
+        // Use no-cors mode because Google Apps Script Web Apps often have CORS issues with client-side fetches
+        // The script will execute, but we won't get a response body back in JS.
+        await fetch(sheetUrl, {
+            method: 'POST',
+            mode: 'no-cors', 
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        console.log("Sent to Google Sheets");
+    } catch (error) {
+        console.error("Failed to sync with Google Sheet:", error);
+    }
 };

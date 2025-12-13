@@ -1,8 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Language, Translation } from '../types';
-import { Save, RotateCcw, Type, Download, Upload, Database, AlertTriangle, Monitor, LogIn, Menu as MenuIcon } from 'lucide-react';
-import { getAppTexts, saveAppTexts, resetAppTexts, createFullBackup, restoreFullBackup } from '../services/settingsService';
+import { Save, RotateCcw, Type, Download, Upload, Database, AlertTriangle, Monitor, LogIn, Menu as MenuIcon, Table, Link } from 'lucide-react';
+import { getAppTexts, saveAppTexts, resetAppTexts, createFullBackup, restoreFullBackup, getGoogleSheetUrl, saveGoogleSheetUrl } from '../services/settingsService';
 
 interface Props {
   lang: Language;
@@ -11,8 +11,13 @@ interface Props {
 
 const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
   const [texts, setTexts] = useState<Translation>(getAppTexts());
+  const [sheetUrl, setSheetUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  useEffect(() => {
+      setSheetUrl(getGoogleSheetUrl());
+  }, []);
+
   // Categorized keys for better UI organization
   const GROUPS = [
       {
@@ -50,8 +55,14 @@ const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
 
   const handleSave = () => {
     saveAppTexts(texts);
+    saveGoogleSheetUrl(sheetUrl);
     onUpdate(texts);
     alert(lang === 'fr' ? "Modifications enregistrées !" : "تم حفظ التغييرات!");
+  };
+
+  const handleSaveUrlOnly = () => {
+      saveGoogleSheetUrl(sheetUrl);
+      alert(lang === 'fr' ? "URL Google Sheets sauvegardée avec succès !" : "تم حفظ رابط Google Sheets بنجاح!");
   };
 
   const handleReset = () => {
@@ -100,7 +111,7 @@ const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
     <div className="space-y-6 animate-fade-in max-w-5xl mx-auto pb-10">
       
       {/* Header */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center sticky top-0 z-10">
         <div>
             <h2 className="text-2xl font-bold text-gov-900">
                 {lang === 'fr' ? 'Paramètres Globaux' : 'الإعدادات العامة'}
@@ -122,7 +133,7 @@ const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
                 className="flex items-center gap-2 bg-gov-600 hover:bg-gov-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-transform active:scale-95"
             >
                 <Save className="w-4 h-4" />
-                {lang === 'fr' ? 'Enregistrer' : 'حفظ'}
+                {lang === 'fr' ? 'Tout Enregistrer' : 'حفظ الكل'}
             </button>
         </div>
       </div>
@@ -131,6 +142,40 @@ const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
           
           {/* LEFT COLUMN: Text Editors */}
           <div className="lg:col-span-2 space-y-6">
+              {/* GOOGLE SHEETS INTEGRATION */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="p-4 bg-green-50 border-b border-green-100 flex items-center gap-2 font-bold text-green-800">
+                      <Table className="w-5 h-5" />
+                      {lang === 'fr' ? 'Synchronisation Google Sheets' : 'مزامنة جوجل شيت'}
+                  </div>
+                  <div className="p-6 space-y-3">
+                      <p className="text-xs text-gray-600">
+                          {lang === 'fr' 
+                            ? "Entrez l'URL de votre script Google Apps (déployé en tant qu'application Web) pour recevoir automatiquement chaque nouvelle déclaration."
+                            : "أدخل رابط سكريبت جوجل (المنشور كتطبيق ويب) لاستلام كل تصريح جديد تلقائيًا."}
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="relative flex-1">
+                              <Link className="absolute top-3 left-3 w-5 h-5 text-gray-400" />
+                              <input 
+                                  type="text" 
+                                  placeholder="https://script.google.com/macros/s/..."
+                                  className="w-full border-gray-300 rounded-lg p-3 pl-10 text-sm focus:ring-2 focus:ring-green-500"
+                                  value={sheetUrl}
+                                  onChange={(e) => setSheetUrl(e.target.value)}
+                              />
+                          </div>
+                          <button 
+                              onClick={handleSaveUrlOnly}
+                              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold shadow-sm transition-colors flex items-center gap-2 justify-center whitespace-nowrap"
+                          >
+                              <Save className="w-4 h-4" />
+                              {lang === 'fr' ? 'Sauvegarder URL' : 'حفظ الرابط'}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+
               {GROUPS.map((group) => (
                   <div key={group.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                       <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center gap-2 font-bold text-gov-800">
@@ -176,7 +221,7 @@ const Settings: React.FC<Props> = ({ lang, onUpdate }) => {
           {/* RIGHT COLUMN: Backup & Info */}
           <div className="space-y-6">
                {/* Backup Section */}
-               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden sticky top-6">
+               <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden sticky top-24">
                    <div className="p-4 bg-gradient-to-r from-blue-600 to-gov-700 text-white flex items-center gap-2 font-bold">
                       <Database className="w-5 h-5" />
                       {lang === 'fr' ? 'Base de Données' : 'قاعدة البيانات'}

@@ -8,7 +8,7 @@ export interface Translation {
   };
 }
 
-export type UserRole = 'SUPER_ADMIN' | 'MINISTRY_ADMIN' | 'EDITOR' | 'VIEWER';
+export type UserRole = 'SUPER_ADMIN' | 'DEPUTY_ADMIN' | 'MINISTRY_ADMIN' | 'EDITOR' | 'VIEWER';
 
 export enum Tab {
   DASHBOARD = 'dashboard',

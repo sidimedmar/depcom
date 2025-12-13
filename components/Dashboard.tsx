@@ -31,17 +31,18 @@ const Dashboard: React.FC<Props> = ({ assets, contacts, groups = [], lang, curre
   const isRTL = lang === 'ar';
   const importInputRef = useRef<HTMLInputElement>(null);
   const [viewingAsset, setViewingAsset] = useState<AssetDeclaration | null>(null);
+  const isGlobalAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'DEPUTY_ADMIN';
 
   // --- FILTERING LOGIC ---
   const filteredAssets = useMemo(() => {
-      if (currentUser.role === 'SUPER_ADMIN') return assets;
+      if (isGlobalAdmin) return assets;
       return assets.filter(a => a.ministryId === currentUser.ministryId);
-  }, [assets, currentUser]);
+  }, [assets, currentUser, isGlobalAdmin]);
 
   const filteredContacts = useMemo(() => {
-      if (currentUser.role === 'SUPER_ADMIN') return contacts;
+      if (isGlobalAdmin) return contacts;
       return contacts.filter(c => c.id === currentUser.ministryId);
-  }, [contacts, currentUser]);
+  }, [contacts, currentUser, isGlobalAdmin]);
 
   const totalValue = filteredAssets.reduce((sum, asset) => sum + asset.value, 0);
   
@@ -128,7 +129,7 @@ const Dashboard: React.FC<Props> = ({ assets, contacts, groups = [], lang, curre
   return (
     <div className="space-y-6">
       
-      {currentUser.role !== 'SUPER_ADMIN' && currentUser.ministryId && (
+      {!isGlobalAdmin && currentUser.ministryId && (
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                   <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
