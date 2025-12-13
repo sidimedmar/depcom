@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { WorkGroup, MinistryContact, Language } from '../types';
 import { generateCommunication } from '../services/geminiService';
-import { Layers, X, MessageCircle, Mail, Sparkles, Bot, CheckCircle, Send, Info } from 'lucide-react';
+import { Layers, X, MessageCircle, Mail, Sparkles, Bot, CheckCircle, Send, Info, Save } from 'lucide-react';
 import { TEXTS } from '../constants';
 
 interface Props {
@@ -19,6 +19,32 @@ const MessagingModal: React.FC<Props> = ({ group, contacts, lang, onClose }) => 
   const [msgSubject, setMsgSubject] = useState('');
   const [sentTracker, setSentTracker] = useState<Set<string>>(new Set());
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  // Load draft on mount
+  useEffect(() => {
+      const draftKey = `draft_msg_${group.id}`;
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+          try {
+              const parsed = JSON.parse(saved);
+              if (parsed.text) setMessageText(parsed.text);
+              if (parsed.subject) setMsgSubject(parsed.subject);
+          } catch(e) { 
+              // Legacy or simple string
+              setMessageText(saved); 
+          }
+      }
+  }, [group.id]);
+
+  const handleSaveDraft = () => {
+      const draftKey = `draft_msg_${group.id}`;
+      localStorage.setItem(draftKey, JSON.stringify({
+          text: messageText,
+          subject: msgSubject,
+          updatedAt: new Date().toISOString()
+      }));
+      alert(lang === 'fr' ? "Message enregistré (brouillon) !" : "تم حفظ الرسالة (مسودة)!");
+  };
 
   const handleWhatsApp = (phone: string, message?: string) => {
     if (!phone) return;
@@ -207,24 +233,35 @@ const MessagingModal: React.FC<Props> = ({ group, contacts, lang, onClose }) => 
                   </div>
 
                   {/* Footer Actions */}
-                  <div className="p-4 bg-white border-t border-gray-200 flex justify-end">
-                       {messageTab === 'email' && (
-                           <button 
-                            onClick={sendGroupEmail}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-transform active:scale-95"
-                           >
-                               <Mail className="w-4 h-4" />
-                               {lang === 'fr' ? 'Ouvrir Mail & Envoyer' : 'فتح البريد والإرسال'}
-                           </button>
-                       )}
-                       {messageTab === 'whatsapp' && (
-                           <button 
-                            onClick={onClose}
-                            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-bold"
-                           >
-                               {lang === 'fr' ? 'Fermer' : 'إغلاق'}
-                           </button>
-                       )}
+                  <div className="p-4 bg-white border-t border-gray-200 flex justify-between items-center">
+                       {/* SAVE DRAFT BUTTON (NEW) */}
+                       <button 
+                            onClick={handleSaveDraft}
+                            className="text-gray-600 hover:text-indigo-600 font-bold flex items-center gap-2 text-sm bg-gray-50 hover:bg-indigo-50 px-4 py-2 rounded-lg border border-gray-200 hover:border-indigo-200 transition-all"
+                       >
+                           <Save className="w-4 h-4" />
+                           {lang === 'fr' ? 'Enregistrer' : 'حفظ'}
+                       </button>
+                       
+                       <div className="flex gap-2">
+                        {messageTab === 'email' && (
+                            <button 
+                                onClick={sendGroupEmail}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-transform active:scale-95"
+                            >
+                                <Mail className="w-4 h-4" />
+                                {lang === 'fr' ? 'Ouvrir Mail & Envoyer' : 'فتح البريد والإرسال'}
+                            </button>
+                        )}
+                        {messageTab === 'whatsapp' && (
+                            <button 
+                                onClick={onClose}
+                                className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-2 rounded-lg font-bold"
+                            >
+                                {lang === 'fr' ? 'Fermer' : 'إغلاق'}
+                            </button>
+                        )}
+                       </div>
                   </div>
               </div>
           </div>

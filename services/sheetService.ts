@@ -1,6 +1,7 @@
 
 import { AssetDeclaration, MinistryContact } from "../types";
 import { getGoogleSheetUrl } from "./settingsService";
+import { ASSET_CATEGORIES } from "../constants";
 
 // Helper to sanitize fields for CSV
 const safeStr = (val: any) => {
@@ -147,6 +148,10 @@ export const syncAssetToSheet = async (asset: AssetDeclaration, ministryName?: {
 
     const details = asset.specificDetails || {};
     
+    // Find the French label for the type
+    const category = ASSET_CATEGORIES.find(c => c.id === asset.type);
+    const typeLabel = category ? category.label.fr : asset.type;
+
     // Create a flat object for the sheet row
     const payload = {
         id: asset.id,
@@ -155,7 +160,7 @@ export const syncAssetToSheet = async (asset: AssetDeclaration, ministryName?: {
         ministryNameFR: ministryName?.fr || '',
         ministryNameAR: ministryName?.ar || '',
         subEntity: asset.subEntity || '',
-        type: asset.type,
+        type: typeLabel, // Send the French label (e.g., 'Immobilier') instead of ID ('RealEstate')
         condition: asset.condition,
         value: asset.value,
         acquisitionDate: asset.acquisitionDate,
